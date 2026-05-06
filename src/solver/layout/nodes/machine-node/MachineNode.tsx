@@ -401,9 +401,14 @@ export const MachineNode = memo((props: IMachineNodeProps) => {
                       <Text size="sm" fw={overclock != 1 ? 'bold' : 'normal'}>
                         {PercentageFormatter.format(overclock)}
                       </Text>
-                      {machineCalc.totalPowerShards > 0 && (
+                      {(machineCalc.groupCalcs
+                        ? machineCalc.groupsTotalShards
+                        : machineCalc.totalPowerShards) > 0 && (
                         <Text size="sm" c="dimmed">
-                          · {machineCalc.totalPowerShards}
+                          ·{' '}
+                          {machineCalc.groupCalcs
+                            ? machineCalc.groupsTotalShards
+                            : machineCalc.totalPowerShards}
                         </Text>
                       )}
                     </Group>

@@ -2,10 +2,21 @@ import { AllFactoryBuildingsMap } from '@/recipes/FactoryBuilding';
 import { AllFactoryItemsMap } from '@/recipes/FactoryItem';
 import { getRecipeProductPerBuilding } from '@/recipes/FactoryRecipe';
 import type { IMachineNodeData } from '@/solver/layout/nodes/machine-node/MachineNode';
-import type { SolverNodeState } from '@/solver/store/Solver';
+import type { MachineGroup, SolverNodeState } from '@/solver/store/Solver';
 
 function calculatePowerShards(overclock: number): number {
   return overclock > 1 ? Math.ceil((overclock - 1) * 2) : 0;
+}
+
+export interface MachineGroupCalc {
+  count: number;
+  overclock: number;
+  somersloops: number;
+  amplifiedRate: number;
+  production: number;
+  power: number;
+  powerShards: number;
+  totalSomersloops: number;
 }
 
 export function calculateMachineNodeBuildings(
@@ -67,6 +78,54 @@ export function calculateMachineNodeBuildings(
     powerShardsPerMachine * fullBuildingsAmount +
     partialBuildingPowerShards * partialBuildingAmount;
 
+  // Machine groups calculation
+  let groupCalcs: MachineGroupCalc[] | undefined;
+  let groupsTotalProduction = 0;
+  let groupsTotalPower = 0;
+  let groupsTotalShards = 0;
+  let groupsTotalSomersloops = 0;
+
+  if (nodeState?.machineGroups && nodeState.machineGroups.length > 0) {
+    groupCalcs = nodeState.machineGroups.map(group => {
+      const gSloopRatio =
+        building.somersloopSlots > 0 && group.somersloops > 0
+          ? Math.min(group.somersloops / building.somersloopSlots, 1)
+          : 0;
+      const gAmplifiedRate = 1 + gSloopRatio;
+      const gProduction =
+        group.count * perBuilding * group.overclock * gAmplifiedRate;
+      const gShards = calculatePowerShards(group.overclock) * group.count;
+      const gBoosted = group.somersloops > 0 ? group.count : 0;
+      const gNormal = group.count - gBoosted;
+      const gPower =
+        gNormal *
+          building.powerConsumption *
+          group.overclock ** building.powerConsumptionExponent +
+        gBoosted *
+          building.powerConsumption *
+          group.overclock ** building.somersloopPowerConsumptionExponent;
+
+      return {
+        count: group.count,
+        overclock: group.overclock,
+        somersloops: group.somersloops,
+        amplifiedRate: gAmplifiedRate,
+        production: gProduction,
+        power: gPower,
+        powerShards: gShards,
+        totalSomersloops: group.somersloops * group.count,
+      };
+    });
+
+    groupsTotalProduction = groupCalcs.reduce((s, g) => s + g.production, 0);
+    groupsTotalPower = groupCalcs.reduce((s, g) => s + g.power, 0);
+    groupsTotalShards = groupCalcs.reduce((s, g) => s + g.powerShards, 0);
+    groupsTotalSomersloops = groupCalcs.reduce(
+      (s, g) => s + g.totalSomersloops,
+      0,
+    );
+  }
+
   return {
     overclock,
     somersloops,
@@ -86,5 +145,11 @@ export function calculateMachineNodeBuildings(
     powerShardsPerMachine,
     partialBuildingPowerShards,
     totalPowerShards,
+    groupCalcs,
+    groupsTotalProduction,
+    groupsTotalPower,
+    groupsTotalShards,
+    groupsTotalSomersloops,
+    requiredProduction: value,
   };
 }

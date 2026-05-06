@@ -9,6 +9,12 @@ export interface SolverRequest {
   objective?: 'minimize_power' | 'minimize_resources' | 'minimize_area';
 }
 
+export interface MachineGroup {
+  count: number;
+  overclock: number;
+  somersloops: number;
+}
+
 export interface SolverNodeState {
   done?: boolean;
   /** Somersloops per machine (0 to building slots). Used by the LP solver. */
@@ -18,6 +24,7 @@ export interface SolverNodeState {
   amplification?: number;
   overclock?: number;
   layoutIgnoreEdges?: boolean;
+  machineGroups?: MachineGroup[];
 }
 
 export type SolverLayoutState = Record<string, { x: number; y: number }>;
