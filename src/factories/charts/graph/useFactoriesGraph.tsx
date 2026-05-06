@@ -1,12 +1,17 @@
 import type { Edge, Node } from '@xyflow/react';
 import { max } from 'lodash';
 import { useMemo } from 'react';
+import { useStore } from '@/core/zustand';
 import { useGameFactories } from '@/games/store/gameFactoriesSelectors';
 import type { IInputEdgeData } from './edges/input-edge/InputEdge';
 import type { IFactoryNodeData } from './nodes/factory-node/FactoryNode';
 
 export function useFactoriesGraph() {
   const factories = useGameFactories();
+  const gameId = useStore(state => state.games.selected);
+  const savedLayout = useStore(
+    state => state.charts.graphLayouts?.[gameId ?? ''],
+  );
 
   return useMemo(() => {
     const nodes: Node<IFactoryNodeData>[] = [];
@@ -25,15 +30,18 @@ export function useFactoriesGraph() {
           ),
       ) ?? 1;
 
+    const hasSavedLayout =
+      savedLayout && Object.keys(savedLayout).length > 0;
+
     for (const factory of factories) {
       if (!factory || factory.progress === 'disabled') continue;
 
+      const savedPos = savedLayout?.[factory.id];
       nodes.push({
         id: factory.id,
         type: 'Factory',
-        position: { x: 0, y: 0 },
+        position: savedPos ?? { x: 0, y: 0 },
         data: {
-          // TODO make this dynamic if name is not available
           label: factory.name ?? 'Factory',
           factory,
         },
@@ -51,11 +59,6 @@ export function useFactoriesGraph() {
           source: input.factoryId,
           target: factory.id,
           type: 'Input',
-          // markerEnd: {
-          //   type: MarkerType.ArrowClosed,
-          //   width: 5,
-          //   height: 5,
-          // },
           data: {
             input,
             scaledValue: (input.amount ?? 0) / maxInputAmount,
@@ -64,6 +67,6 @@ export function useFactoriesGraph() {
       }
     }
 
-    return { nodes, edges };
-  }, [factories]);
+    return { nodes, edges, hasSavedLayout: !!hasSavedLayout };
+  }, [factories, savedLayout]);
 }

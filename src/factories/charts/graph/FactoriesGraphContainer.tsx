@@ -5,10 +5,10 @@ import { useFactoriesGraph } from './useFactoriesGraph';
 export interface IFactoriesGraphContainer {}
 
 export function FactoriesGraphContainer(props: IFactoriesGraphContainer) {
-  const { nodes, edges } = useFactoriesGraph();
+  const { nodes, edges, hasSavedLayout } = useFactoriesGraph();
   return (
     <ReactFlowProvider>
-      <FactoriesGraphLayout nodes={nodes} edges={edges}></FactoriesGraphLayout>
+      <FactoriesGraphLayout nodes={nodes} edges={edges} hasSavedLayout={hasSavedLayout}></FactoriesGraphLayout>
     </ReactFlowProvider>
   );
 }

@@ -6,6 +6,7 @@ import {
   type Edge,
   MiniMap,
   type Node,
+  type NodeChange,
   ReactFlow,
   useEdgesState,
   useNodesInitialized,
@@ -23,6 +24,7 @@ import {
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useStore } from '@/core/zustand';
 import { InputEdge } from './edges/input-edge/InputEdge';
 import { FactoryNode } from './nodes/factory-node/FactoryNode';
 
@@ -32,6 +34,7 @@ logger.setLevel('info');
 interface FactoriesGraphLayoutProps {
   nodes: Node[];
   edges: Edge[];
+  hasSavedLayout?: boolean;
   children?: ReactNode;
 }
 
@@ -43,7 +46,6 @@ const edgeTypes = {
   Input: InputEdge,
 };
 
-// TODO Centralize this, it's the same as in SolverLayout
 export const FactoriesGraphLayout = (props: FactoriesGraphLayoutProps) => {
   const { fitView, getNodes, getEdges } = useReactFlow();
   const navigate = useNavigate();
@@ -63,7 +65,6 @@ export const FactoriesGraphLayout = (props: FactoriesGraphLayoutProps) => {
   const [initialLayoutFinished, setInitialLayoutFinished] = useState(false);
   const [initialFitViewFinished, setInitialFitViewFinished] = useState(false);
 
-  // When nodes change, we need to re-layout them.
   useEffect(() => {
     logger.debug('Initializing nodes...');
     setOpacity(0);
@@ -78,26 +79,24 @@ export const FactoriesGraphLayout = (props: FactoriesGraphLayoutProps) => {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
   useEffect(() => {
-    // We can't trust `nodesInitialized` to be true, because it's updated later in the loop.
-    // We need to check if the nodes have real measurements.
     const hasRealMeasurements =
       nodes[0]?.measured?.width && nodes[0]?.measured?.height;
     logger.debug(
       `Check for re-layout: nodesInitialized=${nodesInitialized}, initialLayoutFinished=${initialLayoutFinished} hasRealMeasurements=${hasRealMeasurements}`,
-    ); // prettier-ignore
+    );
 
-    // 1. Nodes are initialized, so we can layout them.
     if (nodesInitialized && hasRealMeasurements && !initialLayoutFinished) {
-      logger.info(`-> Layouting (initial layout in progress)`); // prettier-ignore
-      logger.debug('Layouting...');
-      const layouted = getLayoutedElements(getNodes(), getEdges());
-
-      setNodes([...layouted.nodes]);
-      setEdges([...layouted.edges]);
+      if (props.hasSavedLayout) {
+        logger.info('Using saved layout');
+      } else {
+        logger.info('-> Layouting (initial layout in progress)');
+        const layouted = getLayoutedElements(getNodes(), getEdges());
+        setNodes([...layouted.nodes]);
+        setEdges([...layouted.edges]);
+      }
       setInitialLayoutFinished(true);
     }
 
-    // 2. Nodes are initialized and layouted, so we can fit the view.
     if (nodesInitialized && initialLayoutFinished && !initialFitViewFinished) {
       logger.debug('-> Fitting view...');
       setInitialFitViewFinished(true);
@@ -107,6 +106,36 @@ export const FactoriesGraphLayout = (props: FactoriesGraphLayoutProps) => {
       });
     }
   }, [nodesInitialized, initialLayoutFinished, initialFitViewFinished]);
+
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChange(changes);
+
+      const hasPositionChange = changes.some(
+        c => c.type === 'position' && !c.dragging && c.position,
+      );
+      if (!hasPositionChange) return;
+
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        const gameId = useStore.getState().games.selected;
+        if (!gameId) return;
+        const currentNodes = getNodes();
+        const layout: Record<string, { x: number; y: number }> = {};
+        for (const node of currentNodes) {
+          layout[node.id] = {
+            x: node.position.x,
+            y: node.position.y,
+          };
+        }
+        useStore.getState().setChartGraphLayout(gameId, layout);
+        logger.debug('Saved chart layout (%d nodes)', currentNodes.length);
+      }, 300);
+    },
+    [onNodesChange, getNodes],
+  );
 
   const ref = useRef<HTMLDivElement>(null);
 
@@ -119,7 +148,7 @@ export const FactoriesGraphLayout = (props: FactoriesGraphLayoutProps) => {
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
-      onNodesChange={onNodesChange}
+      onNodesChange={handleNodesChange}
       onEdgesChange={onEdgesChange}
       onNodeDoubleClick={onNodeDoubleClick}
       connectionLineType={ConnectionLineType.SmoothStep}

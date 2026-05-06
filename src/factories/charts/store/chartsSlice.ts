@@ -1,12 +1,18 @@
 import { useStore } from '@/core/zustand';
 import { createSlice } from '@/core/zustand-helpers/slices';
 
+export interface ChartNodePosition {
+  x: number;
+  y: number;
+}
+
 export interface ChartsSlice {
   selected: 'graph' | 'sankey';
   settings: {
     widthMatchesInputAmount?: boolean;
     colorizeEdgesByTransport?: boolean;
   };
+  graphLayouts?: Record<string, Record<string, ChartNodePosition>>;
 }
 
 export const chartsSlice = createSlice({
@@ -25,6 +31,11 @@ export const chartsSlice = createSlice({
       (key: keyof ChartsSlice['settings'], value: any) => state => {
         if (!state.settings) state.settings = {};
         state.settings[key] = value;
+      },
+    setChartGraphLayout:
+      (gameId: string, layout: Record<string, ChartNodePosition>) => state => {
+        if (!state.graphLayouts) state.graphLayouts = {};
+        state.graphLayouts[gameId] = layout;
       },
   },
 });
