@@ -2,10 +2,12 @@ import { useStore } from '@/core/zustand';
 import { FullHeightContainer } from '@/layout/FullHeightContainer';
 import { MapFiltersPanel } from './MapFiltersPanel';
 import classes from './MapPage.module.css';
+import { useAutoSavegameImport } from './useAutoSavegameImport';
 import { WorldMapView } from './WorldMapView';
 
 export function MapPage() {
   const gameId = useStore(state => state.games.selected ?? null);
+  useAutoSavegameImport(gameId);
 
   return (
     <FullHeightContainer>
