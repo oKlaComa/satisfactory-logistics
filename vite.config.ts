@@ -1,4 +1,3 @@
-import { sentryVitePlugin } from '@sentry/vite-plugin';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig } from 'vite';
@@ -10,10 +9,6 @@ import pkg from './package.json' with { type: 'json' };
 export default defineConfig({
   plugins: [
     react(),
-    sentryVitePlugin({
-      org: 'leonardfactory',
-      project: 'satisfactory-logistics',
-    }),
     viteStaticCopy({
       targets: [
         {
@@ -62,7 +57,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/nymrtujjmzbhxcimjsci\.supabase\.co\/.*/i,
+            urlPattern: /^\/(rest|auth|realtime)\//i,
             handler: 'NetworkOnly',
           },
           {

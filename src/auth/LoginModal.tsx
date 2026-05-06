@@ -1,9 +1,17 @@
-import { Alert, Divider, Modal, Stack, Text } from '@mantine/core';
+import {
+  Alert,
+  Button,
+  Divider,
+  Modal,
+  PasswordInput,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core';
 import { IconCloudOff } from '@tabler/icons-react';
-import type { ReactNode } from 'react';
+import { type FormEvent, type ReactNode, useCallback, useState } from 'react';
+import { supabaseClient } from '@/core/supabase';
 import { useIsOnline } from '@/pwa/useNetworkStatus';
-import { DiscordLoginButton } from './providers/DiscordLoginButton';
-import { GoogleLoginButton } from './providers/GoogleLoginButton';
 
 export interface ILoginModalProps {
   opened: boolean;
@@ -14,14 +22,69 @@ export interface ILoginModalProps {
 export function LoginModal(props: ILoginModalProps) {
   const { opened, close, message } = props;
   const isOnline = useIsOnline();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = useCallback(
+    async (e: FormEvent) => {
+      e.preventDefault();
+      setError(null);
+      setLoading(true);
+      try {
+        const { error: authError } =
+          await supabaseClient.auth.signInWithPassword({
+            email,
+            password,
+          });
+        if (authError) {
+          setError(authError.message);
+        } else {
+          setEmail('');
+          setPassword('');
+          close();
+        }
+      } catch (err: any) {
+        setError(err?.message ?? 'Unknown error');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [email, password, close],
+  );
+
   return (
     <Modal size="sm" opened={opened} onClose={close} title="Authentication">
       {isOnline ? (
         <>
-          <Stack gap="xs">
-            <DiscordLoginButton />
-            <GoogleLoginButton />
-          </Stack>
+          <form onSubmit={handleSubmit}>
+            <Stack gap="sm">
+              <TextInput
+                label="Email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={e => setEmail(e.currentTarget.value)}
+                required
+                autoFocus
+              />
+              <PasswordInput
+                label="Password"
+                placeholder="Your password"
+                value={password}
+                onChange={e => setPassword(e.currentTarget.value)}
+                required
+              />
+              {error && (
+                <Alert color="red" variant="light">
+                  {error}
+                </Alert>
+              )}
+              <Button type="submit" loading={loading} fullWidth>
+                Log in
+              </Button>
+            </Stack>
+          </form>
           <Divider mt="xl" mb="md" />
           <Text ta="center" size="sm" c="dark.2">
             {message ??
