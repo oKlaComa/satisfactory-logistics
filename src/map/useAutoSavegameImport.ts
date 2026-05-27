@@ -7,9 +7,7 @@ const logger = loglev.getLogger('map:auto-savegame');
 const SAVE_URL = '/saves/latest.sav';
 let lastImportedEtag: string | null = null;
 
-export function useAutoSavegameImport(
-  gameId: string | null | undefined,
-): void {
+export function useAutoSavegameImport(gameId: string | null | undefined): void {
   const isRunning = useRef(false);
 
   useEffect(() => {
@@ -20,7 +18,10 @@ export function useAutoSavegameImport(
 
     (async () => {
       try {
-        const head = await fetch(SAVE_URL, { method: 'HEAD' });
+        const head = await fetch(SAVE_URL, {
+          method: 'HEAD',
+          cache: 'no-cache',
+        });
         if (!head.ok) {
           logger.info('No save file available');
           return;
@@ -36,7 +37,7 @@ export function useAutoSavegameImport(
         if (cancelled) return;
 
         logger.info('Fetching latest save...');
-        const resp = await fetch(SAVE_URL);
+        const resp = await fetch(SAVE_URL, { cache: 'no-cache' });
         if (!resp.ok || cancelled) return;
 
         const blob = await resp.blob();
@@ -49,12 +50,24 @@ export function useAutoSavegameImport(
 
         if (cancelled) return;
 
-        useStore
-          .getState()
-          .updateGameFromSavegame(gameId, save, {
-            usedNodes: true,
-            infrastructure: true,
-          });
+        const store = useStore.getState();
+        store.updateGameFromSavegame(gameId, save, {
+          usedNodes: true,
+          infrastructure: true,
+        });
+
+        // Only add newly unlocked recipes, never remove existing ones.
+        const game = store.games[gameId];
+        if (game && save.availableRecipes.length > 0) {
+          const existing = new Set<string>(game.allowedRecipes ?? []);
+          const newRecipes = save.availableRecipes.filter(
+            id => !existing.has(id),
+          );
+          if (newRecipes.length > 0) {
+            store.setGameAllowedRecipes(gameId, [...existing, ...newRecipes]);
+            logger.info('Added %d new recipes', newRecipes.length);
+          }
+        }
 
         if (save.infrastructure) {
           useStore.getState().setInfrastructure(gameId, save.infrastructure);
